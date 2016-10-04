@@ -29,6 +29,12 @@ func (tx *Tx) initialize(db *DB) {
 	tx.hooks = make([]func(), 0)
 }
 
+func (tx *Tx) close() {
+	tx.db = nil
+	tx.rollbacks = make(map[string]*string)
+	tx.hooks = make([]func(), 0)
+}
+
 // Set changes/adds a value to the database
 func (tx *Tx) Set(key, value string) error {
 	if tx.db == nil {

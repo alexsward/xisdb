@@ -39,6 +39,7 @@ func (db *DB) run() error {
 func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
 	txn := &Tx{}
 	txn.initialize(db)
+	defer txn.close()
 
 	db.lock(write)
 
@@ -84,6 +85,7 @@ func (db *DB) rollback(tx *Tx) error {
 	return nil
 }
 
+// lock makes the database locked (uses RWMutex, so multiple readers available)
 func (db *DB) lock(write bool) {
 	if write {
 		db.mutex.Lock()
@@ -93,6 +95,7 @@ func (db *DB) lock(write bool) {
 	db.mutex.RLock()
 }
 
+// unlock makes the database accessible again
 func (db *DB) unlock(write bool) {
 	if write {
 		db.mutex.Unlock()
@@ -102,7 +105,7 @@ func (db *DB) unlock(write bool) {
 	db.mutex.RUnlock()
 }
 
-// Close shuts down the database instnace
+// Close shuts down the database instance
 func (db *DB) Close() error {
 	return nil
 }
