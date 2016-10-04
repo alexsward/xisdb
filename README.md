@@ -9,7 +9,7 @@ XisDB is an experimental low-level key-value database written in Go. Its purpose
 - Supports transactions and rollbacks
 - ACID compliant, sorta?
 
-#### Limitations
+### Limitations
 - Only strings are supported
 - I spent like 6 hours writing it
 - It isn't even fully unit-tested
