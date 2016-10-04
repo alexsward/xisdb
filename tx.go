@@ -26,6 +26,7 @@ func (tx *Tx) initialize(db *DB) {
 	tx.db = db
 	tx.id = randomer.Uint32()
 	tx.rollbacks = make(map[string]*string)
+	tx.hooks = make([]func(), 0)
 }
 
 // Set changes/adds a value to the database
