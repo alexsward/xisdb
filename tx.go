@@ -1,6 +1,7 @@
 package xisdb
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -11,9 +12,12 @@ type Tx struct {
 	db    *DB
 	write bool
 
-	rollbacks map[string]*string
-	commits   map[string]*string
-	hooks     []func()
+	rollbacks map[string]*string // rollback values
+	hooks     []func()           // functions to execute upon commit
+}
+
+func (tx *Tx) String() string {
+	return fmt.Sprintf("id:[%d] write:[%t]", tx.id, tx.write)
 }
 
 var randomer = rand.New(rand.NewSource(time.Now().UnixNano()))
