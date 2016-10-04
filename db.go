@@ -6,10 +6,24 @@ import (
 	"time"
 )
 
-// DB -- the database itself!
+// DB is the data base object itself. It encapsulates all functionality for xisdb.
+// Do not create an instance of this struct directly as you may introduce undesired
+// side-effects through improper initialization.
 type DB struct {
-	mutex sync.RWMutex
-	data  map[string]string
+	mutex      sync.RWMutex      // sync.RWMutex enables multiple read clients but only a single writer
+	persistent bool              // whether to persist to disk or not (not enabled currently)
+	data       map[string]string // the data itself
+}
+
+// Open creates a new database
+func Open() (*DB, error) {
+	db := &DB{
+		data: make(map[string]string),
+	}
+
+	go db.run()
+
+	return db, nil
 }
 
 func (db *DB) run() error {
@@ -48,6 +62,10 @@ func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
 }
 
 func (db *DB) commit(tx *Tx) error {
+	for _, fn := range tx.hooks {
+		fn()
+	}
+
 	db.unlock(tx.write)
 	return nil
 }
@@ -97,15 +115,4 @@ func (db *DB) Read(fn func(tx *Tx) error) error {
 // ReadWrite performs a write-allowed transaction against the database
 func (db *DB) ReadWrite(fn func(tx *Tx) error) error {
 	return db.execute(fn, true)
-}
-
-// Open creates a new database
-func Open() (*DB, error) {
-	db := &DB{
-		data: make(map[string]string),
-	}
-
-	go db.run()
-
-	return db, nil
 }
