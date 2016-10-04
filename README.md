@@ -11,5 +11,6 @@ XisDB is an experimental low-level key-value database written in Go. Its purpose
 
 ### Limitations
 - Only strings are supported
+- It doesn't even persist to disk and there's an option for it
 - I spent like 6 hours writing it
 - It isn't even fully unit-tested
