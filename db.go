@@ -10,15 +10,17 @@ import (
 // Do not create an instance of this struct directly as you may introduce undesired
 // side-effects through improper initialization.
 type DB struct {
-	mutex      sync.RWMutex      // sync.RWMutex enables multiple read clients but only a single writer
+	mutex      sync.RWMutex // sync.RWMutex enables multiple read clients but only a single writer
+	readOnly   bool
 	persistent bool              // whether to persist to disk or not (not enabled currently)
 	data       map[string]string // the data itself
 }
 
 // Open creates a new database
-func Open() (*DB, error) {
+func Open(opts *Options) (*DB, error) {
 	db := &DB{
-		data: make(map[string]string),
+		data:     make(map[string]string),
+		readOnly: opts.ReadOnly,
 	}
 
 	go db.run()
@@ -121,5 +123,9 @@ func (db *DB) Read(fn func(tx *Tx) error) error {
 
 // ReadWrite performs a write-allowed transaction against the database
 func (db *DB) ReadWrite(fn func(tx *Tx) error) error {
+	if db.readOnly {
+		return ErrorDatabaseReadOnly
+	}
+
 	return db.execute(fn, true)
 }

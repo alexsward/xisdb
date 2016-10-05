@@ -9,7 +9,7 @@ import (
 func TestCommitHooks(t *testing.T) {
 	fmt.Println("TestCommitHooks")
 
-	db, _ := Open()
+	db, _ := Open(&Options{})
 	txn := &Tx{}
 	txn.initialize(db)
 

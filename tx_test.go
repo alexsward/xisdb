@@ -10,7 +10,7 @@ import (
 func TestSetRollback(t *testing.T) {
 	fmt.Println("TestSetRollBack")
 
-	db, _ := Open()
+	db, _ := Open(&Options{})
 	db.ReadWrite(func(tx *Tx) error {
 		return tx.Set("key", "value")
 	})
@@ -42,7 +42,7 @@ func TestSetRollback(t *testing.T) {
 func TestSetUpdateRollback(t *testing.T) {
 	fmt.Println("TestSetUpdateRollback")
 
-	db, _ := Open()
+	db, _ := Open(&Options{})
 	db.ReadWrite(func(tx *Tx) error {
 		return tx.Set("key", "value")
 	})
@@ -78,7 +78,7 @@ func TestSetUpdateRollback(t *testing.T) {
 func TestDeleteRollback(t *testing.T) {
 	fmt.Println("TestDeleteRollback")
 
-	db, _ := Open()
+	db, _ := Open(&Options{})
 	db.ReadWrite(func(tx *Tx) error {
 		return tx.Set("key", "value")
 	})
