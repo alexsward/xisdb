@@ -7,6 +7,7 @@ import (
 	"github.com/alexsward/xisdb"
 )
 
+// TestReadOnly -- ensures that things cannot be written to the DB
 func TestReadOnly(t *testing.T) {
 	fmt.Println("TestReadOnly")
 

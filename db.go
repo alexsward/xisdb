@@ -19,12 +19,8 @@ type DB struct {
 // Open creates a new database
 func Open(opts *Options) (*DB, error) {
 	db := &DB{
-		data: make(map[string]string),
-	}
-
-	if opts.ReadOnly {
-		db.readOnly = true
-		db.mutex.Lock()
+		data:     make(map[string]string),
+		readOnly: opts.ReadOnly,
 	}
 
 	go db.run()
