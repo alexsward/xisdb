@@ -80,3 +80,8 @@ func (tx *Tx) Get(key string) (string, error) {
 
 	return tx.db.data[key], nil
 }
+
+// Hooks adds post-commit hooks to this transaction
+func (tx *Tx) Hooks(hooks ...func()) {
+	tx.hooks = append(tx.hooks, hooks...)
+}

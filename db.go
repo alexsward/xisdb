@@ -63,12 +63,16 @@ func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
 }
 
 func (db *DB) commit(tx *Tx) error {
-	for _, fn := range tx.hooks {
-		fn()
-	}
+	db.hooks(tx)
 
 	db.unlock(tx.write)
 	return nil
+}
+
+func (db *DB) hooks(tx *Tx) {
+	for _, fn := range tx.hooks {
+		fn()
+	}
 }
 
 func (db *DB) rollback(tx *Tx) error {
