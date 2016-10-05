@@ -1,27 +1,27 @@
-package xisdb
+package xisdb_test
 
 import (
 	"fmt"
 	"testing"
+
+	"github.com/alexsward/xisdb"
 )
 
 // TestCommitHooks -- verifies that functions execute upon commit
 func TestCommitHooks(t *testing.T) {
 	fmt.Println("TestCommitHooks")
 
-	db, _ := Open(&Options{})
-	txn := &Tx{}
-	txn.initialize(db)
+	db, _ := xisdb.Open(&xisdb.Options{})
 
 	i := 0
 	f := func() {
 		i++
 	}
 
-	err := db.execute(func(tx *Tx) error {
+	err := db.Read(func(tx *xisdb.Tx) error {
 		tx.Hooks(f)
 		return nil
-	}, false)
+	})
 
 	if err != nil {
 		t.Error(err)

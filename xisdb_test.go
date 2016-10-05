@@ -1,16 +1,18 @@
-package xisdb
+package xisdb_test
 
 import (
 	"fmt"
 	"testing"
+
+	"github.com/alexsward/xisdb"
 )
 
 // TestXisDBGet -- tests the higher-level Get API
 func TestXisDBGet(t *testing.T) {
 	fmt.Println("TestXisDBGet")
 
-	db, _ := Open(&Options{})
-	db.ReadWrite(func(tx *Tx) error {
+	db, _ := xisdb.Open(&xisdb.Options{})
+	db.ReadWrite(func(tx *xisdb.Tx) error {
 		return tx.Set("key", "value")
 	})
 
@@ -28,7 +30,7 @@ func TestXisDBGet(t *testing.T) {
 func TestXisDBSet(t *testing.T) {
 	fmt.Println("TestXisDBGet")
 
-	db, _ := Open(&Options{})
+	db, _ := xisdb.Open(&xisdb.Options{})
 	err := db.Set("key", "value")
 	if err != nil {
 		t.Error(err)
@@ -48,7 +50,7 @@ func TestXisDBSet(t *testing.T) {
 func TestXisDBDelete(t *testing.T) {
 	fmt.Println("TestXisDBDelete")
 
-	db, _ := Open(&Options{})
+	db, _ := xisdb.Open(&xisdb.Options{})
 	err := db.Set("key", "value")
 	if err != nil {
 		t.Error(err)

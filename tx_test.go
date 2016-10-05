@@ -1,26 +1,28 @@
-package xisdb
+package xisdb_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/alexsward/xisdb"
 )
 
 // TestSetRollback -- tests an error creating a value
 func TestSetRollback(t *testing.T) {
 	fmt.Println("TestSetRollBack")
 
-	db, _ := Open(&Options{})
-	db.ReadWrite(func(tx *Tx) error {
+	db, _ := xisdb.Open(&xisdb.Options{})
+	db.ReadWrite(func(tx *xisdb.Tx) error {
 		return tx.Set("key", "value")
 	})
 
-	db.ReadWrite(func(tx *Tx) error {
+	db.ReadWrite(func(tx *xisdb.Tx) error {
 		tx.Set("key", "value2")
 		return errors.New("Roll it back")
 	})
 
-	err := db.Read(func(tx *Tx) error {
+	err := db.Read(func(tx *xisdb.Tx) error {
 		val, err := tx.Get("key")
 		if err != nil {
 			return err
@@ -42,12 +44,12 @@ func TestSetRollback(t *testing.T) {
 func TestSetUpdateRollback(t *testing.T) {
 	fmt.Println("TestSetUpdateRollback")
 
-	db, _ := Open(&Options{})
-	db.ReadWrite(func(tx *Tx) error {
+	db, _ := xisdb.Open(&xisdb.Options{})
+	db.ReadWrite(func(tx *xisdb.Tx) error {
 		return tx.Set("key", "value")
 	})
 
-	err := db.ReadWrite(func(tx *Tx) error {
+	err := db.ReadWrite(func(tx *xisdb.Tx) error {
 		tx.Set("key", "updatedValue")
 		return errors.New("Nope!")
 	})
@@ -56,7 +58,7 @@ func TestSetUpdateRollback(t *testing.T) {
 		t.Error("There should have been an error thrown")
 	}
 
-	err = db.Read(func(tx *Tx) error {
+	err = db.Read(func(tx *xisdb.Tx) error {
 		val, err := tx.Get("key")
 		if err != nil {
 			return err
@@ -78,17 +80,17 @@ func TestSetUpdateRollback(t *testing.T) {
 func TestDeleteRollback(t *testing.T) {
 	fmt.Println("TestDeleteRollback")
 
-	db, _ := Open(&Options{})
-	db.ReadWrite(func(tx *Tx) error {
+	db, _ := xisdb.Open(&xisdb.Options{})
+	db.ReadWrite(func(tx *xisdb.Tx) error {
 		return tx.Set("key", "value")
 	})
 
-	db.ReadWrite(func(tx *Tx) error {
+	db.ReadWrite(func(tx *xisdb.Tx) error {
 		tx.Delete("key")
 		return errors.New("This is an error to cause a rollback")
 	})
 
-	db.Read(func(tx *Tx) error {
+	db.Read(func(tx *xisdb.Tx) error {
 		val, err := tx.Get("key")
 		if err != nil {
 			return err
