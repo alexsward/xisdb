@@ -69,7 +69,7 @@ func (tx *Tx) Delete(key string) (bool, error) {
 	tx.rollbacks[key] = &val
 	delete(tx.db.data, key)
 
-	return false, nil
+	return true, nil
 }
 
 // Get retrieves a value from the database, if it exists

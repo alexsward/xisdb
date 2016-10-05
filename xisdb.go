@@ -15,3 +15,21 @@ func (db *DB) Get(key string) (string, error) {
 
 	return val, err
 }
+
+// Set adds/updates an object in the database
+func (db *DB) Set(key, value string) error {
+	return db.ReadWrite(func(tx *Tx) error {
+		return tx.Set(key, value)
+	})
+}
+
+// Delete removes an object from the database
+func (db *DB) Delete(key string) (bool, error) {
+	var existed bool
+	err := db.ReadWrite(func(tx *Tx) error {
+		e, err := tx.Delete(key)
+		existed = e
+		return err
+	})
+	return existed, err
+}
