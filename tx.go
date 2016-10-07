@@ -12,8 +12,8 @@ type Tx struct {
 	db    *DB
 	write bool
 
-	rollbacks map[string]*string // rollback values
-	hooks     []func()           // functions to execute upon commit
+	rollbacks map[string]*Item // rollback values
+	hooks     []func()         // functions to execute upon commit
 }
 
 func (tx *Tx) String() string {
@@ -25,13 +25,13 @@ var randomer = rand.New(rand.NewSource(time.Now().UnixNano()))
 func (tx *Tx) initialize(db *DB) {
 	tx.db = db
 	tx.id = randomer.Uint32()
-	tx.rollbacks = make(map[string]*string)
+	tx.rollbacks = make(map[string]*Item)
 	tx.hooks = make([]func(), 0)
 }
 
 func (tx *Tx) close() {
 	tx.db = nil
-	tx.rollbacks = make(map[string]*string)
+	tx.rollbacks = make(map[string]*Item)
 	tx.hooks = make([]func(), 0)
 }
 
@@ -42,13 +42,13 @@ func (tx *Tx) Set(key, value string) error {
 	}
 	tx.write = true
 
-	var oldValue *string
+	var oldValue *Item
 	if old, exists := tx.db.data[key]; exists {
 		oldValue = &old
 	}
 
 	tx.rollbacks[key] = oldValue
-	tx.db.data[key] = value
+	tx.db.data[key] = Item{key, value}
 
 	return nil
 }
@@ -78,7 +78,11 @@ func (tx *Tx) Get(key string) (string, error) {
 		return "", ErrorNoDatabase
 	}
 
-	return tx.db.data[key], nil
+	if item, exists := tx.db.data[key]; exists {
+		return item.Value, nil
+	}
+
+	return "", ErrorKeyNotFound
 }
 
 // Hooks adds post-commit hooks to this transaction

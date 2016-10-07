@@ -12,14 +12,23 @@ import (
 type DB struct {
 	mutex      sync.RWMutex // sync.RWMutex enables multiple read clients but only a single writer
 	readOnly   bool
-	persistent bool              // whether to persist to disk or not (not enabled currently)
-	data       map[string]string // the data itself
+	persistent bool            // whether to persist to disk or not (not enabled currently)
+	data       map[string]Item // the data itself
+}
+
+// Item is an item in the database, includes both the key and value of the object
+type Item struct {
+	Key, Value string
+}
+
+func (i Item) String() string {
+	return fmt.Sprintf("key:[%s] value:[%s]", i.Key, i.Value)
 }
 
 // Open creates a new database
 func Open(opts *Options) (*DB, error) {
 	db := &DB{
-		data:     make(map[string]string),
+		data:     make(map[string]Item),
 		readOnly: opts.ReadOnly,
 	}
 
