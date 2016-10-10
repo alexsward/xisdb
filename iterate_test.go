@@ -10,7 +10,7 @@ import (
 func TestIterateEach(t *testing.T) {
 	fmt.Println("TestIterateEach")
 
-	db, _ := xisdb.Open(&xisdb.Options{})
+	db := openTestDB()
 	db.ReadWrite(func(tx *xisdb.Tx) error {
 		for i := 1; i <= 10; i++ {
 			k := fmt.Sprintf("key%d", i)

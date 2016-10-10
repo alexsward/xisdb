@@ -11,4 +11,7 @@ var (
 
 	// ErrorDatabaseReadOnly when the database is read-only and a write operation is attempted
 	ErrorDatabaseReadOnly = errors.New("Database is read only")
+
+	// ErrorIncorrectDatabaseFileFormat when the database file has errors
+	ErrorIncorrectDatabaseFileFormat = errors.New("Database file format is incorrect")
 )

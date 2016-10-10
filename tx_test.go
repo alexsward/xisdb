@@ -12,7 +12,7 @@ import (
 func TestSetRollback(t *testing.T) {
 	fmt.Println("TestSetRollBack")
 
-	db, _ := xisdb.Open(&xisdb.Options{})
+	db := openTestDB()
 	db.ReadWrite(func(tx *xisdb.Tx) error {
 		return tx.Set("key", "value")
 	})

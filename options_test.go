@@ -11,7 +11,7 @@ import (
 func TestReadOnly(t *testing.T) {
 	fmt.Println("TestReadOnly")
 
-	db, _ := xisdb.Open(&xisdb.Options{ReadOnly: true})
+	db, _ := xisdb.Open(&xisdb.Options{ReadOnly: true, InMemory: true})
 	err := db.Set("key", "value")
 	if err == nil {
 		t.Error("Expected an error")

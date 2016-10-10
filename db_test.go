@@ -11,7 +11,7 @@ import (
 func TestCommitHooks(t *testing.T) {
 	fmt.Println("TestCommitHooks")
 
-	db, _ := xisdb.Open(&xisdb.Options{})
+	db := openTestDB()
 
 	i := 0
 	f := func() {
