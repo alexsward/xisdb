@@ -2,17 +2,16 @@ package xisdb
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 )
 
 // Tx is a transaction against a database
 type Tx struct {
-	id    uint32
-	db    *DB
-	write bool
-
+	id        int64            //timestamp, in ns, of the transaction
+	db        *DB              // the database
+	write     bool             // if this is a write transaction
 	rollbacks map[string]*Item // rollback values
+	commits   map[string]*Item // commit values
 	hooks     []func()         // functions to execute upon commit
 }
 
@@ -20,18 +19,18 @@ func (tx *Tx) String() string {
 	return fmt.Sprintf("id:[%d] write:[%t]", tx.id, tx.write)
 }
 
-var randomer = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 func (tx *Tx) initialize(db *DB) {
 	tx.db = db
-	tx.id = randomer.Uint32()
+	tx.id = time.Now().UnixNano()
 	tx.rollbacks = make(map[string]*Item)
+	tx.commits = make(map[string]*Item)
 	tx.hooks = make([]func(), 0)
 }
 
 func (tx *Tx) close() {
 	tx.db = nil
 	tx.rollbacks = make(map[string]*Item)
+	tx.commits = make(map[string]*Item)
 	tx.hooks = make([]func(), 0)
 }
 
@@ -48,7 +47,10 @@ func (tx *Tx) Set(key, value string) error {
 	}
 
 	tx.rollbacks[key] = oldValue
-	tx.db.data[key] = Item{key, value}
+
+	item := Item{key, value}
+	tx.db.insert(&item)
+	tx.commits[key] = &item
 
 	return nil
 }
@@ -67,7 +69,8 @@ func (tx *Tx) Delete(key string) (bool, error) {
 	}
 
 	tx.rollbacks[key] = &val
-	delete(tx.db.data, key)
+	tx.commits[key] = nil
+	tx.db.remove(&Item{key, ""})
 
 	return true, nil
 }

@@ -2,17 +2,24 @@ package xisdb
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
+)
+
+const (
+	defaultFilename = "xisdb.data"
 )
 
 // DB is the data base object itself. It encapsulates all functionality for xisdb.
 // Do not create an instance of this struct directly as you may introduce undesired
 // side-effects through improper initialization.
 type DB struct {
-	mutex      sync.RWMutex // sync.RWMutex enables multiple read clients but only a single writer
-	readOnly   bool
-	persistent bool            // whether to persist to disk or not (not enabled currently)
+	mutex      sync.RWMutex    // sync.RWMutex enables multiple read clients but only a single writer
+	persistent bool            // if false, do not persist to disk
+	file       *os.File        // where to save the data
+	fileErrors bool            // if loading a file should return an error
+	readOnly   bool            // if this database is read-only
 	data       map[string]Item // the data itself
 }
 
@@ -28,8 +35,28 @@ func (i Item) String() string {
 // Open creates a new database
 func Open(opts *Options) (*DB, error) {
 	db := &DB{
-		data:     make(map[string]Item),
-		readOnly: opts.ReadOnly,
+		data:       make(map[string]Item),
+		readOnly:   opts.ReadOnly,
+		persistent: !opts.InMemory,
+	}
+
+	if db.persistent {
+		filename := opts.Filename
+		if filename == "" {
+			fmt.Printf("Warning: you specified no filename, using default: %s\n", defaultFilename)
+			filename = defaultFilename
+		}
+
+		f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+		if err != nil {
+			return nil, err
+		}
+		db.file = f
+
+		err = db.load()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	go db.run()
@@ -68,12 +95,20 @@ func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
 	err = db.commit(txn)
 	if err != nil {
 		fmt.Println("Error committing transaction")
+		err = db.rollback(txn) // no idea how to handle an error here...
 	}
 
 	return err
 }
 
 func (db *DB) commit(tx *Tx) error {
+	if db.persistent {
+		err := tx.persist()
+		if err != nil {
+			return err
+		}
+	}
+
 	db.hooks(tx)
 
 	db.unlock(tx.write)
@@ -137,4 +172,12 @@ func (db *DB) ReadWrite(fn func(tx *Tx) error) error {
 	}
 
 	return db.execute(fn, true)
+}
+
+func (db *DB) insert(item *Item) {
+	db.data[item.Key] = *item
+}
+
+func (db *DB) remove(item *Item) {
+	delete(db.data, item.Key)
 }
