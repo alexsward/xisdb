@@ -15,12 +15,13 @@ const (
 // Do not create an instance of this struct directly as you may introduce undesired
 // side-effects through improper initialization.
 type DB struct {
-	mutex      sync.RWMutex    // sync.RWMutex enables multiple read clients but only a single writer
-	persistent bool            // if false, do not persist to disk
-	file       *os.File        // where to save the data
-	fileErrors bool            // if loading a file should return an error
-	readOnly   bool            // if this database is read-only
-	data       map[string]Item // the data itself
+	mutex         sync.RWMutex            // sync.RWMutex enables multiple read clients but only a single writer
+	persistent    bool                    // if false, do not persist to disk
+	file          *os.File                // where to save the data
+	fileErrors    bool                    // if loading a file should return an error
+	readOnly      bool                    // if this database is read-only
+	data          map[string]Item         // the data itself
+	subscriptions map[string]subscription // subscriptions
 }
 
 // Item is an item in the database, includes both the key and value of the object
@@ -35,9 +36,10 @@ func (i Item) String() string {
 // Open creates a new database
 func Open(opts *Options) (*DB, error) {
 	db := &DB{
-		data:       make(map[string]Item),
-		readOnly:   opts.ReadOnly,
-		persistent: !opts.InMemory,
+		data:          make(map[string]Item),
+		subscriptions: make(map[string]subscription),
+		readOnly:      opts.ReadOnly,
+		persistent:    !opts.InMemory,
 	}
 
 	if db.persistent {
@@ -111,6 +113,14 @@ func (db *DB) commit(tx *Tx) error {
 
 	db.hooks(tx)
 
+	if len(db.subscriptions) > 0 {
+		var items []Item
+		for _, item := range tx.commits {
+			items = append(items, *item)
+		}
+		db.publish(items...)
+	}
+
 	db.unlock(tx.write)
 	return nil
 }
@@ -157,6 +167,12 @@ func (db *DB) unlock(write bool) {
 
 // Close shuts down the database instance
 func (db *DB) Close() error {
+	for _, s := range db.subscriptions {
+		for _, ch := range s.channels {
+			close(ch)
+		}
+	}
+
 	return nil
 }
 
