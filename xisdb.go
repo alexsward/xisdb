@@ -19,7 +19,7 @@ func (db *DB) Get(key string) (string, error) {
 // Set adds/updates an object in the database
 func (db *DB) Set(key, value string) error {
 	return db.ReadWrite(func(tx *Tx) error {
-		return tx.Set(key, value)
+		return tx.Set(key, value, nil)
 	})
 }
 

@@ -20,6 +20,8 @@ type DB struct {
 	file          *os.File                // where to save the data
 	fileErrors    bool                    // if loading a file should return an error
 	readOnly      bool                    // if this database is read-only
+	bginterval    int                     // how often to perform background cleanup
+	expires       bool                    // if expiring keys are enabled
 	data          map[string]Item         // the data itself
 	subscriptions map[string]subscription // subscriptions
 }
@@ -27,6 +29,11 @@ type DB struct {
 // Item is an item in the database, includes both the key and value of the object
 type Item struct {
 	Key, Value string
+	metadata   *itemMetadata
+}
+
+type itemMetadata struct {
+	expiration *time.Time
 }
 
 func (i Item) String() string {
@@ -40,6 +47,8 @@ func Open(opts *Options) (*DB, error) {
 		subscriptions: make(map[string]subscription),
 		readOnly:      opts.ReadOnly,
 		persistent:    !opts.InMemory,
+		expires:       !opts.DisableExpiration,
+		bginterval:    opts.BackgroundInterval,
 	}
 
 	if db.persistent {
@@ -61,23 +70,89 @@ func Open(opts *Options) (*DB, error) {
 		}
 	}
 
-	go db.run()
+	db.start()
 
 	return db, nil
 }
 
-func (db *DB) run() error {
-	ticker := time.NewTicker(time.Second * 10)
+// Close shuts down the database instance
+func (db *DB) Close() error {
+	for _, s := range db.subscriptions {
+		for _, ch := range s.channels {
+			close(ch)
+		}
+	}
+
+	return nil
+}
+
+// Read performs a read-only transaction against the database
+func (db *DB) Read(fn func(tx *Tx) error) error {
+	return db.execute(fn, false)
+}
+
+// ReadWrite performs a write-allowed transaction against the database
+func (db *DB) ReadWrite(fn func(tx *Tx) error) error {
+	if db.readOnly {
+		return ErrorDatabaseReadOnly
+	}
+
+	return db.execute(fn, true)
+}
+
+func (db *DB) start() {
+	if db.bginterval < 0 {
+		go func() {
+			select {}
+		}()
+	} else {
+		if db.bginterval == 0 {
+			db.bginterval = 1000
+		}
+
+		go db.background()
+	}
+}
+
+// background performs background tasks, like cleanp of TTL keys
+// TTL cleanup happens in a transaction, so pubsub and persistence and everything else
+// takes place with the expirations as well
+func (db *DB) background() error {
+	ticker := time.NewTicker(time.Millisecond * time.Duration(db.bginterval))
 	defer ticker.Stop()
 	for range ticker.C {
-		// perform anything that needs to be performed periodically
+		if !db.expires {
+			continue
+		}
+
+		err := db.ReadWrite(func(tx *Tx) error {
+			now := time.Now().UnixNano()
+			for _, item := range db.data {
+				if item.metadata != nil && item.metadata.expiration != nil {
+					if now > item.metadata.expiration.Unix() {
+						_, err := tx.Delete(item.Key)
+						if err != nil {
+							return err
+						}
+					}
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
-	txn := &Tx{}
+	txn := &Tx{
+		write: write,
+	}
 	txn.initialize(db)
 	defer txn.close()
 
@@ -87,9 +162,10 @@ func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
 	if err != nil {
 		fmt.Printf("There was an error executing the transaction: %s\n", err)
 
-		err = db.rollback(txn)
-		if err != nil {
+		rollbackErr := db.rollback(txn)
+		if rollbackErr != nil {
 			fmt.Println("Error rolling back transaction")
+			err = rollbackErr
 		}
 		return err
 	}
@@ -165,29 +241,17 @@ func (db *DB) unlock(write bool) {
 	db.mutex.RUnlock()
 }
 
-// Close shuts down the database instance
-func (db *DB) Close() error {
-	for _, s := range db.subscriptions {
-		for _, ch := range s.channels {
-			close(ch)
-		}
+func (db *DB) get(key string) *Item {
+	if item, exists := db.data[key]; exists {
+		return &item
 	}
 
 	return nil
 }
 
-// Read performs a read-only transaction against the database
-func (db *DB) Read(fn func(tx *Tx) error) error {
-	return db.execute(fn, false)
-}
-
-// ReadWrite performs a write-allowed transaction against the database
-func (db *DB) ReadWrite(fn func(tx *Tx) error) error {
-	if db.readOnly {
-		return ErrorDatabaseReadOnly
-	}
-
-	return db.execute(fn, true)
+func (db *DB) exists(key string) bool {
+	_, exists := db.data[key]
+	return exists
 }
 
 func (db *DB) insert(item *Item) {

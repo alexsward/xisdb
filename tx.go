@@ -34,21 +34,44 @@ func (tx *Tx) close() {
 	tx.hooks = make([]func(), 0)
 }
 
+// Get retrieves a value from the database, if it exists
+func (tx *Tx) Get(key string) (string, error) {
+	if tx.db == nil {
+		return "", ErrorNoDatabase
+	}
+
+	item := tx.db.get(key)
+	if item != nil {
+		return item.Value, nil
+	}
+
+	return "", ErrorKeyNotFound
+}
+
 // Set changes/adds a value to the database
-func (tx *Tx) Set(key, value string) error {
+func (tx *Tx) Set(key, value string, md *SetMetadata) error {
 	if tx.db == nil {
 		return ErrorNoDatabase
 	}
-	tx.write = true
+
+	if !tx.write {
+		return ErrorNotWriteTransaction
+	}
 
 	var oldValue *Item
-	if old, exists := tx.db.data[key]; exists {
-		oldValue = &old
+	if tx.db.exists(key) {
+		oldValue = tx.db.get(key)
 	}
 
 	tx.rollbacks[key] = oldValue
 
-	item := Item{key, value}
+	imd := &itemMetadata{}
+	if md != nil && md.TTL > 0 {
+		t := time.Now().Add(time.Millisecond * time.Duration(md.TTL))
+		imd.expiration = &t
+	}
+
+	item := Item{key, value, imd}
 	tx.db.insert(&item)
 	tx.commits[key] = &item
 
@@ -60,35 +83,30 @@ func (tx *Tx) Delete(key string) (bool, error) {
 	if tx.db == nil {
 		return false, ErrorNoDatabase
 	}
-	tx.write = true
 
-	val, exists := tx.db.data[key]
-	if !exists {
-		tx.rollbacks[key] = nil
-		return false, nil
+	if !tx.write {
+		return false, ErrorNotWriteTransaction
 	}
 
-	tx.rollbacks[key] = &val
+	if !tx.db.exists(key) {
+		tx.rollbacks[key] = nil
+		return false, ErrorKeyNotFound
+	}
+
+	item := tx.db.get(key)
+	tx.rollbacks[key] = item
 	tx.commits[key] = nil
-	tx.db.remove(&Item{key, ""})
+	tx.db.remove(&Item{key, "", item.metadata})
 
 	return true, nil
-}
-
-// Get retrieves a value from the database, if it exists
-func (tx *Tx) Get(key string) (string, error) {
-	if tx.db == nil {
-		return "", ErrorNoDatabase
-	}
-
-	if item, exists := tx.db.data[key]; exists {
-		return item.Value, nil
-	}
-
-	return "", ErrorKeyNotFound
 }
 
 // Hooks adds post-commit hooks to this transaction
 func (tx *Tx) Hooks(hooks ...func()) {
 	tx.hooks = append(tx.hooks, hooks...)
+}
+
+// SetMetadata includes any additional non key-value parameters for setting a key
+type SetMetadata struct {
+	TTL int64
 }

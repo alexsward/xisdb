@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/alexsward/xisdb"
 )
@@ -14,11 +15,11 @@ func TestSetRollback(t *testing.T) {
 
 	db := openTestDB()
 	db.ReadWrite(func(tx *xisdb.Tx) error {
-		return tx.Set("key", "value")
+		return tx.Set("key", "value", nil)
 	})
 
 	db.ReadWrite(func(tx *xisdb.Tx) error {
-		tx.Set("key", "value2")
+		tx.Set("key", "value2", nil)
 		return errors.New("Roll it back")
 	})
 
@@ -46,15 +47,15 @@ func TestSetUpdateRollback(t *testing.T) {
 
 	db, _ := xisdb.Open(&xisdb.Options{})
 	db.ReadWrite(func(tx *xisdb.Tx) error {
-		return tx.Set("key", "value")
+		return tx.Set("key", "value", nil)
 	})
 
 	err := db.ReadWrite(func(tx *xisdb.Tx) error {
-		tx.Set("key", "updatedValue")
+		tx.Set("key", "updatedValue", nil)
 		return errors.New("Nope!")
 	})
 
-	if err != nil {
+	if err == nil {
 		t.Error("There should have been an error thrown")
 	}
 
@@ -72,7 +73,7 @@ func TestSetUpdateRollback(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Error("There should have been an error thrown")
+		t.Error("There should not have been an error thrown")
 	}
 }
 
@@ -80,9 +81,9 @@ func TestSetUpdateRollback(t *testing.T) {
 func TestDeleteRollback(t *testing.T) {
 	fmt.Println("TestDeleteRollback")
 
-	db, _ := xisdb.Open(&xisdb.Options{})
+	db := openTestDB()
 	db.ReadWrite(func(tx *xisdb.Tx) error {
-		return tx.Set("key", "value")
+		return tx.Set("key", "value", nil)
 	})
 
 	db.ReadWrite(func(tx *xisdb.Tx) error {
@@ -101,4 +102,33 @@ func TestDeleteRollback(t *testing.T) {
 		}
 		return err
 	})
+}
+
+// TestExpiration -- tests that expiring a key works
+func TestExpiration(t *testing.T) {
+	db, _ := xisdb.Open(&xisdb.Options{
+		InMemory:           true,
+		BackgroundInterval: 10,
+	})
+
+	db.ReadWrite(func(tx *xisdb.Tx) error {
+		err := tx.Set("expireme", "value", &xisdb.SetMetadata{10})
+		return err
+	})
+
+	v, err := db.Get("expireme")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if v != "value" {
+		t.Errorf("Expected expireme key to have value [value], got [%s]", v)
+	}
+
+	time.Sleep(30 * time.Millisecond)
+
+	_, err = db.Get("expireme")
+	if err != xisdb.ErrorKeyNotFound {
+		t.Errorf("Expected [%s] as error, got [%s]", xisdb.ErrorKeyNotFound, err)
+	}
 }
