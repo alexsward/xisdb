@@ -15,7 +15,7 @@ func TestIterateEach(t *testing.T) {
 		for i := 1; i <= 10; i++ {
 			k := fmt.Sprintf("key%d", i)
 			v := fmt.Sprintf("value%d", i)
-			tx.Set(k, v)
+			tx.Set(k, v, nil)
 		}
 		return nil
 	})

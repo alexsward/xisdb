@@ -14,4 +14,7 @@ var (
 
 	// ErrorIncorrectDatabaseFileFormat when the database file has errors
 	ErrorIncorrectDatabaseFileFormat = errors.New("Database file format is incorrect")
+
+	// ErrorNotWriteTransaction when an update/write operation is attempted with a Read transaction
+	ErrorNotWriteTransaction = errors.New("Cannot perform write operations in a read transaction")
 )

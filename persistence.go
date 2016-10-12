@@ -17,7 +17,7 @@ func (db *DB) load() error {
 			if err != nil {
 				return err
 			}
-			db.remove(&Item{key, ""})
+			db.remove(&Item{key, "", nil})
 			continue
 		}
 
@@ -31,7 +31,7 @@ func (db *DB) load() error {
 			return err
 		}
 		value := kv[vi+2 : len(kv)]
-		db.insert(&Item{key, value})
+		db.insert(&Item{key, value, nil})
 	}
 
 	return nil

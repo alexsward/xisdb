@@ -13,4 +13,10 @@ type Options struct {
 
 	// SkipDatabaseFileErrors will just pass over database file errors on load
 	SkipDatabaseFileErrors bool
+
+	// DisableExpiration will turn off TTL keys, even if TTL is provided with a key
+	DisableExpiration bool
+
+	// BackgroundInterval (in ms) determines how frequently to perform background cleanup, < 0 means never, 0 defaults to 1000
+	BackgroundInterval int
 }

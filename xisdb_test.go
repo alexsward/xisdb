@@ -9,7 +9,8 @@ import (
 
 func openTestDB() *xisdb.DB {
 	db, _ := xisdb.Open(&xisdb.Options{
-		InMemory: true,
+		InMemory:           true,
+		BackgroundInterval: -1,
 	})
 	return db
 }
@@ -20,7 +21,7 @@ func TestXisDBGet(t *testing.T) {
 
 	db := openTestDB()
 	db.ReadWrite(func(tx *xisdb.Tx) error {
-		return tx.Set("key", "value")
+		return tx.Set("key", "value", nil)
 	})
 
 	v, err := db.Get("key")
