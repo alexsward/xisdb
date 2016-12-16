@@ -23,7 +23,7 @@ func (db *DB) load() error {
 
 		vi := strings.LastIndex(kv, "v~")
 		if vi == -1 && op == "+" {
-			return ErrorIncorrectDatabaseFileFormat
+			return ErrIncorrectDatabaseFileFormat
 		}
 
 		key, err := getKey(kv, vi, db.fileErrors)
@@ -40,7 +40,7 @@ func (db *DB) load() error {
 func getKey(kv string, vi int, fileErrors bool) (string, error) {
 	i := strings.Index(kv, "k~")
 	if i == -1 && fileErrors {
-		return "", ErrorIncorrectDatabaseFileFormat
+		return "", ErrIncorrectDatabaseFileFormat
 	}
 
 	if vi == -1 {

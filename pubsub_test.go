@@ -7,8 +7,8 @@ import (
 )
 
 // TestSubscribe validates that subscriptions work
-func TestSubscribe(t *testing.T) {
-	fmt.Println("TestSubscribe")
+func TestPubSubSubscribe(t *testing.T) {
+	fmt.Println("--- TestPubSubSubscribe")
 	db := openTestDB()
 	_, err := db.Subscribe("*", 1)
 	if err != nil {
@@ -17,8 +17,8 @@ func TestSubscribe(t *testing.T) {
 }
 
 // TestUnsubscribe validates that unsubscribing works
-func TestUnsubscribe(t *testing.T) {
-	fmt.Println("TestUnsubscribe")
+func TestPubSubUnsubscribe(t *testing.T) {
+	fmt.Println("--- TestPubSubUnsubscribe")
 	db := openTestDB()
 	ch, err := db.Subscribe("*", 1)
 	if err != nil {
@@ -31,9 +31,9 @@ func TestUnsubscribe(t *testing.T) {
 	}
 }
 
-// TestPublish validates that proper items are received over a channel
-func TestPublish(t *testing.T) {
-	fmt.Println("TestPublish")
+// TestPubSubPublish validates that proper items are received over a channel
+func TestPubSubPublish(t *testing.T) {
+	fmt.Println("--- TestPubSubPublish")
 	db := openTestDB()
 	ch, err := db.Subscribe("pubsub:", 1)
 	if err != nil {
@@ -44,7 +44,6 @@ func TestPublish(t *testing.T) {
 
 	select {
 	case item := <-ch:
-		fmt.Println("Received item")
 		if item.Key != "pubsub:test" {
 			t.Errorf("Expected [pubsub:test], got [%s]", item.Key)
 		}

@@ -13,61 +13,67 @@ func openTestDB() *DB {
 	return db
 }
 
-// TestXisDBGet -- tests the higher-level Get API
-func TestXisDBGet(t *testing.T) {
-	fmt.Println("TestXisDBGet")
+// NOTE: many of these tests will fail unexpectedly as they just test high-level, not underlying
+// Underlying APIs will be used that these tests will assume pass appropriately
 
-	db := openTestDB()
-	db.ReadWrite(func(tx *Tx) error {
-		return tx.Set("key", "value", nil)
-	})
-
-	v, err := db.Get("key")
-	if err != nil {
-		t.Error(err)
+func TestXisGet(t *testing.T) {
+	fmt.Println("--- TestXisGet")
+	tests := []struct {
+		key, value string
+		add        bool
+		err        error
+	}{
+		{"key", "value", true, nil},
+		{"key", "value", false, ErrKeyNotFound},
 	}
-
-	if v != "value" {
-		t.Errorf("Expected [value], got [%s]", v)
-	}
-}
-
-// TestXisDBSet -- tests higher-level Set API
-func TestXisDBSet(t *testing.T) {
-	fmt.Println("TestXisDBGet")
-
-	db := openTestDB()
-	err := db.Set("key", "value")
-	if err != nil {
-		t.Error(err)
-	}
-
-	v, err := db.Get("key")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if v != "value" {
-		t.Errorf("Expected [value], got [%s]", v)
+	for i, test := range tests {
+		db := openTestDB()
+		if test.add {
+			db.ReadWrite(func(tx *Tx) error {
+				return tx.Set(test.key, test.value, nil)
+			})
+		}
+		val, err := db.Get(test.key)
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error '%s', got '%s'", i+1, test.err, err)
+			continue
+		}
+		if test.err != nil {
+			continue
+		}
+		if val != test.value {
+			t.Errorf("Test %d failed: expected value '%s', got '%s'", i+1, test.value, val)
+		}
 	}
 }
 
-// TestXisDBDelete -- tests high level delete API
-func TestXisDBDelete(t *testing.T) {
-	fmt.Println("TestXisDBDelete")
-
-	db := openTestDB()
-	err := db.Set("key", "value")
-	if err != nil {
-		t.Error(err)
+func TestXisExists(t *testing.T) {
+	fmt.Println("--- TestXisExists")
+	tests := []struct {
+		key         string
+		add, exists bool
+		err         error
+	}{
+		{"key", true, true, nil},
+		{"key", false, false, nil},
 	}
-
-	removed, err := db.Delete("key")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if !removed {
-		t.Error("Expected to remove key, did not")
+	for i, test := range tests {
+		db := openTestDB()
+		if test.add {
+			db.ReadWrite(func(tx *Tx) error {
+				return tx.Set(test.key, "test", nil)
+			})
+		}
+		exists, err := db.Exists(test.key)
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error '%s', got '%s'", i+1, test.err, err)
+			continue
+		}
+		if test.err != nil {
+			continue
+		}
+		if exists != test.exists {
+			t.Errorf("Test %d failed: expected exists %t, got %t", i+1, test.exists, exists)
+		}
 	}
 }

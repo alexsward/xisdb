@@ -23,6 +23,7 @@ type DB struct {
 	bginterval    int                     // how often to perform background cleanup
 	expires       bool                    // if expiring keys are enabled
 	data          map[string]Item         // the data itself
+	indexes       map[string]*index       // indexes on the data
 	subscriptions map[string]subscription // subscriptions
 }
 
@@ -44,6 +45,7 @@ func (i Item) String() string {
 func Open(opts *Options) (*DB, error) {
 	db := &DB{
 		data:          make(map[string]Item),
+		indexes:       make(map[string]*index),
 		subscriptions: make(map[string]subscription),
 		readOnly:      opts.ReadOnly,
 		persistent:    !opts.InMemory,
@@ -54,7 +56,6 @@ func Open(opts *Options) (*DB, error) {
 	if db.persistent {
 		filename := opts.Filename
 		if filename == "" {
-			fmt.Printf("Warning: you specified no filename, using default: %s\n", defaultFilename)
 			filename = defaultFilename
 		}
 
@@ -94,7 +95,7 @@ func (db *DB) Read(fn func(tx *Tx) error) error {
 // ReadWrite performs a write-allowed transaction against the database
 func (db *DB) ReadWrite(fn func(tx *Tx) error) error {
 	if db.readOnly {
-		return ErrorDatabaseReadOnly
+		return ErrDatabaseReadOnly
 	}
 
 	return db.execute(fn, true)
@@ -150,21 +151,15 @@ func (db *DB) background() error {
 }
 
 func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
-	txn := &Tx{
-		write: write,
-	}
-	txn.initialize(db)
+	txn := NewTransaction(write, db)
 	defer txn.close()
 
-	db.lock(write)
+	db.lock(write) // TODO: defer db.unlock(write) ?
 
 	err := fn(txn)
 	if err != nil {
-		fmt.Printf("There was an error executing the transaction: %s\n", err)
-
 		rollbackErr := db.rollback(txn)
 		if rollbackErr != nil {
-			fmt.Println("Error rolling back transaction")
 			err = rollbackErr
 		}
 		return err
@@ -172,7 +167,6 @@ func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
 
 	err = db.commit(txn)
 	if err != nil {
-		fmt.Println("Error committing transaction")
 		err = db.rollback(txn) // no idea how to handle an error here...
 	}
 
@@ -260,4 +254,20 @@ func (db *DB) insert(item *Item) {
 
 func (db *DB) remove(item *Item) {
 	delete(db.data, item.Key)
+}
+
+func (db *DB) hasIndex(name string) bool {
+	_, exists := db.indexes[name]
+	return exists
+}
+
+func (db *DB) index(item *Item) []string {
+	var indexes []string
+	for name, index := range db.indexes {
+		if index.match(item) {
+			index.add(item)
+			indexes = append(indexes, name)
+		}
+	}
+	return indexes
 }

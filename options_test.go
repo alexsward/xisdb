@@ -7,7 +7,7 @@ import (
 
 // TestReadOnly -- ensures that things cannot be written to the DB
 func TestReadOnly(t *testing.T) {
-	fmt.Println("TestReadOnly")
+	fmt.Println("--- TestReadOnly")
 
 	db, _ := Open(&Options{ReadOnly: true, InMemory: true})
 	err := db.Set("key", "value")
@@ -15,7 +15,7 @@ func TestReadOnly(t *testing.T) {
 		t.Error("Expected an error")
 	}
 
-	if err != ErrorDatabaseReadOnly {
-		t.Errorf("Expected %s as an error, got %s", ErrorDatabaseReadOnly, err)
+	if err != ErrDatabaseReadOnly {
+		t.Errorf("Expected %s as an error, got %s", ErrDatabaseReadOnly, err)
 	}
 }

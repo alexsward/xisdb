@@ -3,18 +3,27 @@ package xisdb
 import "errors"
 
 var (
-	// ErrorNoDatabase - When a transaction doesn't have access to the database
-	ErrorNoDatabase = errors.New("There's no database")
+	// ErrNoDatabase - When a transaction doesn't have access to the database
+	ErrNoDatabase = errors.New("There's no database")
 
-	// ErrorKeyNotFound when the key isn't found
-	ErrorKeyNotFound = errors.New("Key not found")
+	// ErrKeyNotFound when the key isn't found
+	ErrKeyNotFound = errors.New("Key not found")
 
-	// ErrorDatabaseReadOnly when the database is read-only and a write operation is attempted
-	ErrorDatabaseReadOnly = errors.New("Database is read only")
+	// ErrDatabaseReadOnly when the database is read-only and a write operation is attempted
+	ErrDatabaseReadOnly = errors.New("Database is read only")
 
-	// ErrorIncorrectDatabaseFileFormat when the database file has errors
-	ErrorIncorrectDatabaseFileFormat = errors.New("Database file format is incorrect")
+	// ErrIncorrectDatabaseFileFormat when the database file has errors
+	ErrIncorrectDatabaseFileFormat = errors.New("Database file format is incorrect")
 
-	// ErrorNotWriteTransaction when an update/write operation is attempted with a Read transaction
-	ErrorNotWriteTransaction = errors.New("Cannot perform write operations in a read transaction")
+	// ErrNotWriteTransaction when an update/write operation is attempted with a Read transaction
+	ErrNotWriteTransaction = errors.New("Cannot perform write operations in a read transaction")
+
+	// ErrInvalidIndexName when an index name is invalid
+	ErrInvalidIndexName = errors.New("Index name is invalid")
+
+	// ErrIndexAlreadyExists when a duplicate index is attempted to be added to the database
+	ErrIndexAlreadyExists = errors.New("Index already exists")
+
+	// ErrIndexDoesNotExist when an index doesn't exist, usually when attempting to iterate/scan
+	ErrIndexDoesNotExist = errors.New("Index doesn't exist")
 )

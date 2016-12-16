@@ -1,132 +1,254 @@
 package xisdb
 
 import (
-	"errors"
 	"fmt"
 	"testing"
-	"time"
+
+	"github.com/alexsward/xisdb/indexes"
 )
 
-// TestSetRollback -- tests an error creating a value
-func TestSetRollback(t *testing.T) {
-	fmt.Println("TestSetRollBack")
+func TestTxClose(t *testing.T) {
+	fmt.Println("--- TestTxClose")
+	tx := NewTransaction(false, openTestDB())
+	if tx.closed {
+		t.Errorf("Expected tx to not be closed, was")
+	}
+	tx.close()
+	if len(tx.hooks) != 0 {
+		t.Errorf("Expected 0 hooks after close, got %d", len(tx.hooks))
+	}
+	if len(tx.rollbacks) != 0 {
+		t.Errorf("Expected 0 rollbacks after close, got %d", len(tx.rollbacks))
+	}
+	if len(tx.rollbackIndexes) != 0 {
+		t.Errorf("Expected 0 rollbackIndexes after close, got %d", len(tx.rollbackIndexes))
+	}
+	if tx.db != nil {
+		t.Errorf("Expected nil DB for transaction, wasn't")
+	}
+	if !tx.closed {
+		t.Errorf("Expected transaction to be closed, wasn't")
+	}
+}
 
+func TestTxGet(t *testing.T) {
+	fmt.Println("--- TestTxGet")
+	tests := []struct {
+		set, value, get string
+		close           bool
+		err             error
+	}{
+		{"key", "value", "key", false, nil},
+		{"key", "value", "key", true, ErrNoDatabase},
+		{"key", "value", "unknown", false, ErrKeyNotFound},
+	}
+	for i, test := range tests {
+		db := openTestDB()
+		db.data[test.set] = Item{Key: test.set, Value: test.value}
+		tx := NewTransaction(false, db)
+		if test.close {
+			tx.close()
+		}
+		got, err := tx.Get(test.get)
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error '%s', got '%s'", i+1, test.err, err)
+			continue
+		}
+		if test.err != nil {
+			continue
+		}
+		if got != test.value {
+			t.Errorf("Test %d failed: Expected value '%s', got '%s'", i+1, test.value, got)
+		}
+	}
+}
+
+func TestTxExists(t *testing.T) {
+	fmt.Println("--- TestTxExists")
+	tests := []struct {
+		key                string
+		close, add, exists bool
+		err                error
+	}{
+		{"key", false, true, true, nil},
+		{"key", false, false, false, nil},
+		{"key", true, false, false, ErrNoDatabase},
+	}
+	for i, test := range tests {
+		db := openTestDB()
+		tx := NewTransaction(true, db)
+		if test.close {
+			tx.close()
+		}
+		if test.add {
+			db.Set(test.key, "test")
+		}
+		exists, err := tx.Exists(test.key)
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error '%s', got '%s'", i+1, test.err, err)
+			continue
+		}
+		if test.err != nil {
+			continue
+		}
+		if test.exists != exists {
+			t.Errorf("Test %d failed: expected exists:%t, got %t", i+1, test.exists, exists)
+		}
+	}
+}
+
+func TestTxSet(t *testing.T) {
+	fmt.Println("--- TestTxSet")
+	tests := []struct {
+		set, value   string
+		write, close bool
+		err          error
+	}{
+		{"key", "value", true, false, nil},
+		{"key", "value", true, true, ErrNoDatabase},
+		{"key", "value", false, false, ErrNotWriteTransaction},
+	}
+	for i, test := range tests {
+		db := openTestDB()
+		tx := NewTransaction(test.write, db)
+		if test.close {
+			tx.close()
+		}
+		err := tx.Set(test.set, test.value, nil)
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error '%s', got '%s'", i+1, test.err, err)
+			continue
+		}
+		if test.err != nil {
+			continue
+		}
+		val, ok := db.data[test.set]
+		if !ok {
+			t.Errorf("Test %d failed: key not found", i+1)
+		}
+		if val.Value != test.value {
+			t.Errorf("Test %d failed: expected value '%s', got '%s'", i+1, test.value, val.Value)
+		}
+	}
+}
+
+func TestTxDelete(t *testing.T) {
+	fmt.Println("--- TestTxDelete")
+	tests := []struct {
+		key, value, remove    string
+		write, close, deleted bool
+		err                   error
+	}{
+		{"key", "value", "key", true, false, true, nil},
+		{"key", "value", "key", true, true, false, ErrNoDatabase},
+		{"key", "value", "key", false, false, true, ErrNotWriteTransaction},
+		{"key", "value", "key2", true, false, false, ErrKeyNotFound},
+	}
+	for i, test := range tests {
+		db := openTestDB()
+		db.Set(test.key, test.value)
+		tx := NewTransaction(test.write, db)
+		if test.close {
+			tx.close()
+		}
+		deleted, err := tx.Delete(test.remove)
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error '%s', got '%s'", i+1, test.err, err)
+			continue
+		}
+		if test.err != nil {
+			continue
+		}
+		if deleted != test.deleted {
+			t.Errorf("Test %d failed: expected deleted:%t, got:%t", i+1, test.deleted, deleted)
+			continue
+		}
+		_, found := db.data[test.remove]
+		if found {
+			t.Errorf("Expected to not still find the data")
+		}
+	}
+}
+
+func TestTxAddIndexErrors(t *testing.T) {
+	fmt.Println("--- TestTxAddIndexErrors")
 	db := openTestDB()
-	db.ReadWrite(func(tx *Tx) error {
-		return tx.Set("key", "value", nil)
-	})
+	tx := NewTransaction(true, db)
+	tx.close()
+	err := tx.AddIndex("", KeyIndex, nil, nil)
+	if err != ErrNoDatabase {
+		t.Errorf("Expected error adding index to closed transaction: '%s', got '%s'", ErrNoDatabase, err)
+	}
+	tx = NewTransaction(false, db)
+	err = tx.AddIndex("index", KeyIndex, nil, nil)
+	if err != ErrNotWriteTransaction {
+		t.Errorf("Expected error adding index to closed transaction: '%s', got '%s'", ErrNotWriteTransaction, err)
+	}
+	tx = NewTransaction(true, db)
+	err = tx.AddIndex("same", KeyIndex, nil, nil)
+	err = tx.AddIndex("same", KeyIndex, nil, nil)
+	if err != ErrIndexAlreadyExists {
+		t.Errorf("Expected error adding index that already exists transaction: '%s', got '%s'", ErrIndexAlreadyExists, err)
+	}
+}
 
-	db.ReadWrite(func(tx *Tx) error {
-		tx.Set("key", "value2", nil)
-		return errors.New("Roll it back")
-	})
+// TestTxDeleteIndex tests removal of indexes within a transaction
+func TestTxDeleteIndex(t *testing.T) {
+	fmt.Println("--- TestTxDeleteIndex")
+	tests := []struct {
+		name           string
+		init, expected bool
+		err            error
+	}{
+		{"exists", true, true, nil},
+		{"doesnt-exist", false, false, nil},
+	}
+	for i, test := range tests {
+		db := openTestDB()
+		if test.init {
+			db.indexes[test.name] = &index{}
+		}
+		removed, err := db.DeleteIndex(test.name)
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error '%s', got '%s'", i+1, test.err, err)
+			continue
+		}
+		if test.err != nil {
+			continue
+		}
 
-	err := db.Read(func(tx *Tx) error {
-		val, err := tx.Get("key")
+		if removed != test.expected {
+			t.Errorf("Test %d failed: expected removal %t, got %t", i+1, test.expected, removed)
+		}
+	}
+}
+
+func TestTxAddIndexKeyWildCard(t *testing.T) {
+	fmt.Println("--- TestTxAddIndexKeyWildCard")
+	tests := []struct {
+		add []string
+	}{
+		{[]string{}},
+		{[]string{"a", "abc", "1234", "some data", "json?", "{}"}},
+	}
+	for i, test := range tests {
+		db := openTestDB()
+		tx := NewTransaction(true, db)
+		for _, k := range test.add {
+			db.Set(k, "value")
+		}
+		err := tx.AddIndex("test", KeyIndex, indexes.WildcardMatcher, NaturalOrderKeyComparison)
 		if err != nil {
-			return err
+			t.Errorf("Test %d failed: didn't expect error, got: '%s'", i+i, err)
+			continue
 		}
-
-		if val != "value" {
-			return fmt.Errorf("Incorrect value, expected [value], got %s ", val)
+		idx, exists := db.indexes["test"]
+		if !exists {
+			t.Errorf("Index didn't exist after Add")
+			continue
 		}
-
-		return nil
-	})
-
-	if err != nil {
-		t.Error(err)
-	}
-}
-
-// TestSetUpdateRollback -- tests an error on update, gets rolled back
-func TestSetUpdateRollback(t *testing.T) {
-	fmt.Println("TestSetUpdateRollback")
-
-	db, _ := Open(&Options{})
-	db.ReadWrite(func(tx *Tx) error {
-		return tx.Set("key", "value", nil)
-	})
-
-	err := db.ReadWrite(func(tx *Tx) error {
-		tx.Set("key", "updatedValue", nil)
-		return errors.New("Nope!")
-	})
-
-	if err == nil {
-		t.Error("There should have been an error thrown")
-	}
-
-	err = db.Read(func(tx *Tx) error {
-		val, err2 := tx.Get("key")
-		if err2 != nil {
-			return err
+		if idx.tree.Size() != uint(len(test.add)) {
+			t.Errorf("Test %d failed: index expected to have %d items, had: %d", i+1, idx.tree.Size(), len(test.add))
 		}
-
-		if val != "value" {
-			t.Error("Value was supposed to be value")
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		t.Error("There should not have been an error thrown")
-	}
-}
-
-// TestDeleteRollback -- tests rolling back a delete, transaction throws exception
-func TestDeleteRollback(t *testing.T) {
-	fmt.Println("TestDeleteRollback")
-
-	db := openTestDB()
-	db.ReadWrite(func(tx *Tx) error {
-		return tx.Set("key", "value", nil)
-	})
-
-	db.ReadWrite(func(tx *Tx) error {
-		tx.Delete("key")
-		return errors.New("This is an error to cause a rollback")
-	})
-
-	db.Read(func(tx *Tx) error {
-		val, err := tx.Get("key")
-		if err != nil {
-			return err
-		}
-
-		if val == "" {
-			t.Errorf("key [key] was not found: %s", err)
-		}
-		return err
-	})
-}
-
-// TestExpiration -- tests that expiring a key works
-func TestExpiration(t *testing.T) {
-	db, _ := Open(&Options{
-		InMemory:           true,
-		BackgroundInterval: 10,
-	})
-
-	db.ReadWrite(func(tx *Tx) error {
-		err := tx.Set("expireme", "value", &SetMetadata{10})
-		return err
-	})
-
-	v, err := db.Get("expireme")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if v != "value" {
-		t.Errorf("Expected expireme key to have value [value], got [%s]", v)
-	}
-
-	time.Sleep(30 * time.Millisecond)
-
-	_, err = db.Get("expireme")
-	if err != ErrorKeyNotFound {
-		t.Errorf("Expected [%s] as error, got [%s]", ErrorKeyNotFound, err)
 	}
 }
