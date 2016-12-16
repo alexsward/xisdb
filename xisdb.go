@@ -2,7 +2,7 @@ package xisdb
 
 import (
 	"github.com/alexsward/xisdb/indexes"
-	"github.com/alexsward/xistree"
+	"github.com/alexsward/xisdb/tree"
 )
 
 // This file contains xisdb functions that manage transactions for the user
@@ -67,8 +67,8 @@ func (db *DB) Delete(key string) (bool, error) {
 }
 
 // AddIndex will add an index to the database
-// Will match using the given Matcher and uses the xistree.Comparator function
-func (db *DB) AddIndex(name string, it IndexType, m indexes.Matcher, c xistree.Comparator) error {
+// Will match using the given Matcher and uses the tree.Comparator function
+func (db *DB) AddIndex(name string, it IndexType, m indexes.Matcher, c tree.Comparator) error {
 	if name == "" {
 		return ErrInvalidIndexName
 	}

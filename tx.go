@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/alexsward/xisdb/indexes"
-	"github.com/alexsward/xistree"
+	"github.com/alexsward/xisdb/tree"
 )
 
 // Tx is a transaction against a database
@@ -240,7 +240,7 @@ func (tx *Tx) clear(b *bucket) error {
 }
 
 // AddIndex creates a new index in the database using a read-write transaction
-func (tx *Tx) AddIndex(name string, it IndexType, m indexes.Matcher, c xistree.Comparator) error {
+func (tx *Tx) AddIndex(name string, it IndexType, m indexes.Matcher, c tree.Comparator) error {
 	if tx.db == nil {
 		return ErrNoDatabase
 	}
