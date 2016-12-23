@@ -1,10 +1,8 @@
-package xisdb_test
+package xisdb
 
 import (
 	"fmt"
 	"testing"
-
-	"github.com/alexsward/xisdb"
 )
 
 // TestCommitHooks -- verifies that functions execute upon commit
@@ -18,7 +16,7 @@ func TestCommitHooks(t *testing.T) {
 		i++
 	}
 
-	err := db.Read(func(tx *xisdb.Tx) error {
+	err := db.Read(func(tx *Tx) error {
 		tx.Hooks(f)
 		return nil
 	})

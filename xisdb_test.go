@@ -1,14 +1,12 @@
-package xisdb_test
+package xisdb
 
 import (
 	"fmt"
 	"testing"
-
-	"github.com/alexsward/xisdb"
 )
 
-func openTestDB() *xisdb.DB {
-	db, _ := xisdb.Open(&xisdb.Options{
+func openTestDB() *DB {
+	db, _ := Open(&Options{
 		InMemory:           true,
 		BackgroundInterval: -1,
 	})
@@ -20,7 +18,7 @@ func TestXisDBGet(t *testing.T) {
 	fmt.Println("TestXisDBGet")
 
 	db := openTestDB()
-	db.ReadWrite(func(tx *xisdb.Tx) error {
+	db.ReadWrite(func(tx *Tx) error {
 		return tx.Set("key", "value", nil)
 	})
 

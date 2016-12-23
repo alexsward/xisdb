@@ -1,4 +1,4 @@
-package xisdb_test
+package xisdb
 
 import (
 	"fmt"

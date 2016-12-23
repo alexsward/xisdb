@@ -1,12 +1,10 @@
-package xisdb_test
+package xisdb
 
 import (
 	"errors"
 	"fmt"
 	"testing"
 	"time"
-
-	"github.com/alexsward/xisdb"
 )
 
 // TestSetRollback -- tests an error creating a value
@@ -14,16 +12,16 @@ func TestSetRollback(t *testing.T) {
 	fmt.Println("TestSetRollBack")
 
 	db := openTestDB()
-	db.ReadWrite(func(tx *xisdb.Tx) error {
+	db.ReadWrite(func(tx *Tx) error {
 		return tx.Set("key", "value", nil)
 	})
 
-	db.ReadWrite(func(tx *xisdb.Tx) error {
+	db.ReadWrite(func(tx *Tx) error {
 		tx.Set("key", "value2", nil)
 		return errors.New("Roll it back")
 	})
 
-	err := db.Read(func(tx *xisdb.Tx) error {
+	err := db.Read(func(tx *Tx) error {
 		val, err := tx.Get("key")
 		if err != nil {
 			return err
@@ -45,12 +43,12 @@ func TestSetRollback(t *testing.T) {
 func TestSetUpdateRollback(t *testing.T) {
 	fmt.Println("TestSetUpdateRollback")
 
-	db, _ := xisdb.Open(&xisdb.Options{})
-	db.ReadWrite(func(tx *xisdb.Tx) error {
+	db, _ := Open(&Options{})
+	db.ReadWrite(func(tx *Tx) error {
 		return tx.Set("key", "value", nil)
 	})
 
-	err := db.ReadWrite(func(tx *xisdb.Tx) error {
+	err := db.ReadWrite(func(tx *Tx) error {
 		tx.Set("key", "updatedValue", nil)
 		return errors.New("Nope!")
 	})
@@ -59,9 +57,9 @@ func TestSetUpdateRollback(t *testing.T) {
 		t.Error("There should have been an error thrown")
 	}
 
-	err = db.Read(func(tx *xisdb.Tx) error {
-		val, err := tx.Get("key")
-		if err != nil {
+	err = db.Read(func(tx *Tx) error {
+		val, err2 := tx.Get("key")
+		if err2 != nil {
 			return err
 		}
 
@@ -82,16 +80,16 @@ func TestDeleteRollback(t *testing.T) {
 	fmt.Println("TestDeleteRollback")
 
 	db := openTestDB()
-	db.ReadWrite(func(tx *xisdb.Tx) error {
+	db.ReadWrite(func(tx *Tx) error {
 		return tx.Set("key", "value", nil)
 	})
 
-	db.ReadWrite(func(tx *xisdb.Tx) error {
+	db.ReadWrite(func(tx *Tx) error {
 		tx.Delete("key")
 		return errors.New("This is an error to cause a rollback")
 	})
 
-	db.Read(func(tx *xisdb.Tx) error {
+	db.Read(func(tx *Tx) error {
 		val, err := tx.Get("key")
 		if err != nil {
 			return err
@@ -106,13 +104,13 @@ func TestDeleteRollback(t *testing.T) {
 
 // TestExpiration -- tests that expiring a key works
 func TestExpiration(t *testing.T) {
-	db, _ := xisdb.Open(&xisdb.Options{
+	db, _ := Open(&Options{
 		InMemory:           true,
 		BackgroundInterval: 10,
 	})
 
-	db.ReadWrite(func(tx *xisdb.Tx) error {
-		err := tx.Set("expireme", "value", &xisdb.SetMetadata{10})
+	db.ReadWrite(func(tx *Tx) error {
+		err := tx.Set("expireme", "value", &SetMetadata{10})
 		return err
 	})
 
@@ -128,7 +126,7 @@ func TestExpiration(t *testing.T) {
 	time.Sleep(30 * time.Millisecond)
 
 	_, err = db.Get("expireme")
-	if err != xisdb.ErrorKeyNotFound {
-		t.Errorf("Expected [%s] as error, got [%s]", xisdb.ErrorKeyNotFound, err)
+	if err != ErrorKeyNotFound {
+		t.Errorf("Expected [%s] as error, got [%s]", ErrorKeyNotFound, err)
 	}
 }
