@@ -7,7 +7,7 @@ import (
 
 // TestReadOnly -- ensures that things cannot be written to the DB
 func TestReadOnly(t *testing.T) {
-	fmt.Println("--- TestReadOnly")
+	fmt.Println("-- TestReadOnly")
 
 	db, _ := Open(&Options{ReadOnly: true, InMemory: true})
 	err := db.Set("key", "value")

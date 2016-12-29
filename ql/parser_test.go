@@ -6,7 +6,7 @@ import (
 )
 
 func TestParserBasicFunctions(t *testing.T) {
-	fmt.Println("--- TestParserBasicFunctions")
+	fmt.Println("-- TestParserBasicFunctions")
 	p := NewParser(nil)
 	p.tokens = []*Token{}
 	p.position = -1
@@ -31,7 +31,7 @@ func TestParserBasicFunctions(t *testing.T) {
 }
 
 func TestParserIsStatement(t *testing.T) {
-	fmt.Println("--- TestParserIsStatement")
+	fmt.Println("-- TestParserIsStatement")
 	tests := []struct {
 		token    Token
 		expected bool
@@ -64,7 +64,7 @@ func TestParserIsStatement(t *testing.T) {
 }
 
 func TestParserExtractIdentifiers(t *testing.T) {
-	fmt.Println("--- TestParserExtractIdentifiers")
+	fmt.Println("-- TestParserExtractIdentifiers")
 	tests := []struct {
 		statement string
 		err       error
@@ -105,7 +105,7 @@ func TestParserExtractIdentifiers(t *testing.T) {
 }
 
 func TestParserGetStatement(t *testing.T) {
-	fmt.Println("--- TestParserGetStatement")
+	fmt.Println("-- TestParserGetStatement")
 	tests := []struct {
 		statement string
 		err       error
@@ -142,7 +142,7 @@ func TestParserGetStatement(t *testing.T) {
 }
 
 func TestParserSetStatement(t *testing.T) {
-	fmt.Println("--- TestParserSetStatement")
+	fmt.Println("-- TestParserSetStatement")
 	tests := []struct {
 		statement string
 		err       error
@@ -189,7 +189,7 @@ func TestParserSetStatement(t *testing.T) {
 }
 
 func TestParserDelStatement(t *testing.T) {
-	fmt.Println("--- TestParserDelStatement")
+	fmt.Println("-- TestParserDelStatement")
 	tests := []struct {
 		statement string
 		err       error
@@ -222,7 +222,7 @@ func TestParserDelStatement(t *testing.T) {
 }
 
 func TestParserSingleSelect(t *testing.T) {
-	fmt.Println("--- TestParserSelect")
+	fmt.Println("-- TestParserSelect")
 	tests := []struct {
 		statement  string
 		parseError error

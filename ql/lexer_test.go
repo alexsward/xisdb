@@ -6,7 +6,7 @@ import (
 )
 
 func TestLexerFirstChar(t *testing.T) {
-	fmt.Println("--- TestLexerFirstChar")
+	fmt.Println("-- TestLexerFirstChar")
 	tests := []struct {
 		err      error
 		str      string
@@ -30,7 +30,7 @@ func TestLexerFirstChar(t *testing.T) {
 }
 
 func TestLexerMatch(t *testing.T) {
-	fmt.Println("--- TestLexerRead")
+	fmt.Println("-- TestLexerRead")
 	tests := []struct {
 		str                string
 		fn                 func(byte) bool
@@ -52,7 +52,7 @@ func TestLexerMatch(t *testing.T) {
 }
 
 func TestLexerSingleTokens(t *testing.T) {
-	fmt.Println("--- TestLexerSingleTokens")
+	fmt.Println("-- TestLexerSingleTokens")
 	tests := []struct {
 		str      string
 		expected TokenType
@@ -97,7 +97,7 @@ func TestLexerSingleTokens(t *testing.T) {
 }
 
 func TestLexerMultipleTokens(t *testing.T) {
-	fmt.Println("--- TestLexerMultipleTokens")
+	fmt.Println("-- TestLexerMultipleTokens")
 	tests := []struct {
 		str      string
 		expected []TokenType
@@ -135,7 +135,7 @@ func TestLexerMultipleTokens(t *testing.T) {
 }
 
 func TestLexerNonKeywords(t *testing.T) {
-	fmt.Println("--- TestLexerIdentifiers")
+	fmt.Println("-- TestLexerIdentifiers")
 	tests := []struct {
 		str      string
 		err      error

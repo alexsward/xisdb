@@ -8,7 +8,7 @@ import (
 )
 
 func TestTxClose(t *testing.T) {
-	fmt.Println("--- TestTxClose")
+	fmt.Println("-- TestTxClose")
 	tx := NewTransaction(false, openTestDB())
 	if tx.closed {
 		t.Errorf("Expected tx to not be closed, was")
@@ -20,8 +20,8 @@ func TestTxClose(t *testing.T) {
 	if len(tx.rollbacks) != 0 {
 		t.Errorf("Expected 0 rollbacks after close, got %d", len(tx.rollbacks))
 	}
-	if len(tx.rollbackIndexes) != 0 {
-		t.Errorf("Expected 0 rollbackIndexes after close, got %d", len(tx.rollbackIndexes))
+	if len(tx.rollbackBuckets) != 0 {
+		t.Errorf("Expected 0 rollbackBuckets after close, got %d", len(tx.rollbackBuckets))
 	}
 	if tx.db != nil {
 		t.Errorf("Expected nil DB for transaction, wasn't")
@@ -31,8 +31,120 @@ func TestTxClose(t *testing.T) {
 	}
 }
 
+func TestTxBucketCreate(t *testing.T) {
+	fmt.Println("-- TestTxBucketCreate")
+	tests := []struct {
+		err       error
+		db, write bool
+	}{
+		{ErrNoDatabase, false, false},
+		{ErrNotWriteTransaction, true, false},
+		{nil, true, true},
+	}
+	for i, test := range tests {
+		var db *DB
+		if test.db {
+			db = openTestDB()
+		}
+		tx := NewTransaction(test.write, db)
+		_, err := tx.Bucket("name")
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error %s, got %s", i+1, test.err, err)
+		}
+	}
+}
+
+func TestTxBucketDelete(t *testing.T) {
+	fmt.Println("-- TextTxBucketDelete")
+	tests := []struct {
+		err            error
+		name           string
+		db, write      bool
+		create, expect bool
+	}{
+		{nil, "b1", true, true, true, true},
+		{nil, "b1", true, true, false, false},
+		{ErrNoDatabase, "b1", false, true, false, false},
+		{ErrNotWriteTransaction, "b1", true, false, false, false},
+	}
+	for i, test := range tests {
+		var db *DB
+		if test.db {
+			db = openTestDB()
+		}
+		tx := NewTransaction(test.write, db)
+		if test.create {
+			db.buckets[test.name] = newBucket(test.name, db)
+		}
+		result, err := tx.DeleteBucket(test.name)
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error %s, got %s", i+1, test.err, err)
+			continue
+		}
+		if test.err != nil {
+			continue
+		}
+		if result != test.expect {
+			t.Errorf("Test %d failed: expected delete result:%t, got %t", i+1, test.expect, result)
+		}
+	}
+}
+
+func TestTxBuckets(t *testing.T) {
+	fmt.Println("-- TestTxBuckets")
+	tests := []struct {
+		db, write bool
+		err       error
+		adds      []string
+		expected  []string
+	}{
+		{true, true, nil, []string{}, []string{""}},
+		{true, true, nil, []string{"b1"}, []string{"", "b1"}},
+		{true, true, nil, []string{"b1", "b2"}, []string{"", "b1", "b2"}},
+		{false, true, ErrNoDatabase, []string{}, []string{""}},
+		{true, false, ErrNotWriteTransaction, []string{}, []string{""}},
+	}
+	for i, test := range tests {
+		var db *DB
+		if test.db {
+			db = openTestDB()
+		}
+		tx := NewTransaction(test.write, db)
+		for _, add := range test.adds {
+			db.buckets[add] = newBucket(add, db)
+		}
+		buckets, err := tx.Buckets()
+		if err != test.err {
+			t.Errorf("Test %d failed: expected error '%s', got '%s'", i+1, test.err, err)
+			continue
+		}
+		if test.err != nil {
+			continue
+		}
+		if len(buckets) != len(test.expected) {
+			t.Errorf("Test %d failed: Expected %d buckets, got %d", i+1, len(test.expected), len(buckets))
+			continue
+		}
+		if !buckets[0].managed.isRoot() {
+			t.Errorf("Test %d failed: Expected first bucket to be root, it wasn't, it was: '%s'", i+1, buckets[0].managed.name)
+			continue
+		}
+		for _, bucket := range buckets[1:] {
+			found := false
+			for _, expected := range test.expected {
+				if expected == bucket.managed.name {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("Test %d failed: didn't find %s bucket but it was returned", i+1, bucket.managed.name)
+			}
+		}
+	}
+}
+
 func TestTxGet(t *testing.T) {
-	fmt.Println("--- TestTxGet")
+	fmt.Println("-- TestTxGet")
 	tests := []struct {
 		set, value, get string
 		close           bool
@@ -44,7 +156,7 @@ func TestTxGet(t *testing.T) {
 	}
 	for i, test := range tests {
 		db := openTestDB()
-		db.data[test.set] = Item{Key: test.set, Value: test.value}
+		db.root().data[test.set] = Item{Key: test.set, Value: test.value}
 		tx := NewTransaction(false, db)
 		if test.close {
 			tx.close()
@@ -64,7 +176,7 @@ func TestTxGet(t *testing.T) {
 }
 
 func TestTxExists(t *testing.T) {
-	fmt.Println("--- TestTxExists")
+	fmt.Println("-- TestTxExists")
 	tests := []struct {
 		key                string
 		close, add, exists bool
@@ -98,7 +210,7 @@ func TestTxExists(t *testing.T) {
 }
 
 func TestTxSet(t *testing.T) {
-	fmt.Println("--- TestTxSet")
+	fmt.Println("-- TestTxSet")
 	tests := []struct {
 		set, value   string
 		write, close bool
@@ -122,7 +234,7 @@ func TestTxSet(t *testing.T) {
 		if test.err != nil {
 			continue
 		}
-		val, ok := db.data[test.set]
+		val, ok := db.root().data[test.set]
 		if !ok {
 			t.Errorf("Test %d failed: key not found", i+1)
 		}
@@ -133,7 +245,7 @@ func TestTxSet(t *testing.T) {
 }
 
 func TestTxDelete(t *testing.T) {
-	fmt.Println("--- TestTxDelete")
+	fmt.Println("-- TestTxDelete")
 	tests := []struct {
 		key, value, remove    string
 		write, close, deleted bool
@@ -163,15 +275,32 @@ func TestTxDelete(t *testing.T) {
 			t.Errorf("Test %d failed: expected deleted:%t, got:%t", i+1, test.deleted, deleted)
 			continue
 		}
-		_, found := db.data[test.remove]
+		_, found := db.root().data[test.remove]
 		if found {
 			t.Errorf("Expected to not still find the data")
 		}
 	}
 }
 
+func TestTxAddRollback(t *testing.T) {
+	fmt.Println("-- TestTxAddRollback")
+	db := openTestDB()
+	tx := NewTransaction(false, db)
+	tx.addRollback("", "key", nil)
+	if len(tx.rollbacks) != 0 {
+		t.Errorf("Expected no rollbacks added to read-only transaction, got 1")
+	}
+	tx = NewTransaction(true, db)
+	tx.addRollback("bucket", "key", nil)
+	tx.addRollback("bucket", "key", &Item{"key", "value1", nil})
+	tx.addRollback("bucket", "key", &Item{"key", "value2", nil})
+	if len(tx.rollbacks) != 1 {
+		t.Errorf("Expected single rollback bucket, got %d", len(tx.rollbacks))
+	}
+}
+
 func TestTxAddIndexErrors(t *testing.T) {
-	fmt.Println("--- TestTxAddIndexErrors")
+	fmt.Println("-- TestTxAddIndexErrors")
 	db := openTestDB()
 	tx := NewTransaction(true, db)
 	tx.close()
@@ -194,7 +323,7 @@ func TestTxAddIndexErrors(t *testing.T) {
 
 // TestTxDeleteIndex tests removal of indexes within a transaction
 func TestTxDeleteIndex(t *testing.T) {
-	fmt.Println("--- TestTxDeleteIndex")
+	fmt.Println("-- TestTxDeleteIndex")
 	tests := []struct {
 		name           string
 		init, expected bool
@@ -206,7 +335,7 @@ func TestTxDeleteIndex(t *testing.T) {
 	for i, test := range tests {
 		db := openTestDB()
 		if test.init {
-			db.indexes[test.name] = &index{}
+			db.root().indexes[test.name] = &index{}
 		}
 		removed, err := db.DeleteIndex(test.name)
 		if err != test.err {
@@ -224,7 +353,7 @@ func TestTxDeleteIndex(t *testing.T) {
 }
 
 func TestTxAddIndexKeyWildCard(t *testing.T) {
-	fmt.Println("--- TestTxAddIndexKeyWildCard")
+	fmt.Println("-- TestTxAddIndexKeyWildCard")
 	tests := []struct {
 		add []string
 	}{
@@ -242,7 +371,7 @@ func TestTxAddIndexKeyWildCard(t *testing.T) {
 			t.Errorf("Test %d failed: didn't expect error, got: '%s'", i+i, err)
 			continue
 		}
-		idx, exists := db.indexes["test"]
+		idx, exists := db.root().indexes["test"]
 		if !exists {
 			t.Errorf("Index didn't exist after Add")
 			continue

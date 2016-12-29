@@ -1,7 +1,6 @@
 package xisdb
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -15,16 +14,14 @@ const (
 // Do not create an instance of this struct directly as you may introduce undesired
 // side-effects through improper initialization.
 type DB struct {
-	mutex         sync.RWMutex            // sync.RWMutex enables multiple read clients but only a single writer
-	persistent    bool                    // if false, do not persist to disk
-	file          *os.File                // where to save the data
-	fileErrors    bool                    // if loading a file should return an error
-	readOnly      bool                    // if this database is read-only
-	bginterval    int                     // how often to perform background cleanup
-	expires       bool                    // if expiring keys are enabled
-	data          map[string]Item         // the data itself
-	indexes       map[string]*index       // indexes on the data
-	subscriptions map[string]subscription // subscriptions
+	mutex      sync.RWMutex       // sync.RWMutex enables multiple read clients but only a single writer
+	persistent bool               // if false, do not persist to disk
+	file       *os.File           // where to save the data
+	fileErrors bool               // if loading a file should return an error
+	readOnly   bool               // if this database is read-only
+	bginterval int                // how often to perform background cleanup
+	expires    bool               // if expiring keys are enabled
+	buckets    map[string]*bucket // buckets
 }
 
 // Item is an item in the database, includes both the key and value of the object
@@ -37,53 +34,22 @@ type itemMetadata struct {
 	expiration *time.Time
 }
 
-func (i Item) String() string {
-	return fmt.Sprintf("key:[%s] value:[%s]", i.Key, i.Value)
-}
-
 // Open creates a new database
 func Open(opts *Options) (*DB, error) {
 	db := &DB{
-		data:          make(map[string]Item),
-		indexes:       make(map[string]*index),
-		subscriptions: make(map[string]subscription),
-		readOnly:      opts.ReadOnly,
-		persistent:    !opts.InMemory,
-		expires:       !opts.DisableExpiration,
-		bginterval:    opts.BackgroundInterval,
+		readOnly:   opts.ReadOnly,
+		persistent: !opts.InMemory,
+		expires:    !opts.DisableExpiration,
+		bginterval: opts.BackgroundInterval,
+		buckets:    make(map[string]*bucket),
 	}
-
-	if db.persistent {
-		filename := opts.Filename
-		if filename == "" {
-			filename = defaultFilename
-		}
-
-		f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
-		if err != nil {
-			return nil, err
-		}
-		db.file = f
-
-		err = db.load()
-		if err != nil {
-			return nil, err
-		}
-	}
-
+	db.buckets[""] = newBucket("", db) // adding the rootBucket
 	db.start()
-
 	return db, nil
 }
 
 // Close shuts down the database instance
 func (db *DB) Close() error {
-	for _, s := range db.subscriptions {
-		for _, ch := range s.channels {
-			close(ch)
-		}
-	}
-
 	return nil
 }
 
@@ -99,6 +65,38 @@ func (db *DB) ReadWrite(fn func(tx *Tx) error) error {
 	}
 
 	return db.execute(fn, true)
+}
+
+// addBucket will create a new bucket with the name, otherwise returns the existing
+// returns the bucket and whether or not it was created
+func (db *DB) addBucket(name string) (*bucket, bool) {
+	if bucket, exists := db.buckets[name]; exists {
+		return bucket, false
+	}
+
+	bucket := newBucket(name, db)
+	db.buckets[name] = bucket
+	return bucket, true
+}
+
+// deleteBucket removes a bucket from the database, returns if the bucket exists
+// retruns an error if an attempt to remove the root bucket is made
+func (db *DB) deleteBucket(name string) (bool, error) {
+	bucket, exists := db.buckets[name]
+	if !exists {
+		return exists, nil
+	}
+
+	if bucket.isRoot() {
+		return true, ErrCannotDeleteRootBucket
+	}
+
+	delete(db.buckets, name)
+	return exists, nil
+}
+
+func (db *DB) root() *bucket {
+	return db.buckets[""]
 }
 
 func (db *DB) start() {
@@ -127,18 +125,24 @@ func (db *DB) background() error {
 		}
 
 		err := db.ReadWrite(func(tx *Tx) error {
+			buckets, err := tx.Buckets()
+			if err != nil {
+				return err
+			}
+			// TODO: potentially make expiration non-transactional
 			now := time.Now().UnixNano()
-			for _, item := range db.data {
-				if item.metadata != nil && item.metadata.expiration != nil {
-					if now > item.metadata.expiration.Unix() {
-						_, err := tx.Delete(item.Key)
-						if err != nil {
-							return err
+			for _, bucket := range buckets {
+				for _, item := range bucket.managed.data {
+					if item.metadata != nil && item.metadata.expiration != nil {
+						if now > item.metadata.expiration.Unix() {
+							_, err := tx.delete(bucket.managed, item.Key)
+							if err != nil {
+								return err
+							}
 						}
 					}
 				}
 			}
-
 			return nil
 		})
 
@@ -152,11 +156,16 @@ func (db *DB) background() error {
 
 func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
 	txn := NewTransaction(write, db)
-	defer txn.close()
-
 	db.lock(write) // TODO: defer db.unlock(write) ?
+	defer txn.close()
+	defer db.unlock(txn.write)
 
 	err := fn(txn)
+	if !write {
+		// TODO: make this a slice?
+		return firstNonNil(db.commit(txn), err)
+	}
+
 	if err != nil {
 		rollbackErr := db.rollback(txn)
 		if rollbackErr != nil {
@@ -169,29 +178,13 @@ func (db *DB) execute(fn func(tx *Tx) error, write bool) error {
 	if err != nil {
 		err = db.rollback(txn) // no idea how to handle an error here...
 	}
-
 	return err
 }
 
 func (db *DB) commit(tx *Tx) error {
-	if db.persistent {
-		err := tx.persist()
-		if err != nil {
-			return err
-		}
-	}
-
 	db.hooks(tx)
-
-	if len(db.subscriptions) > 0 {
-		var items []Item
-		for _, item := range tx.commits {
-			items = append(items, *item)
-		}
-		db.publish(items...)
-	}
-
-	db.unlock(tx.write)
+	// persist to disk
+	// pub-sub
 	return nil
 }
 
@@ -202,16 +195,30 @@ func (db *DB) hooks(tx *Tx) {
 }
 
 func (db *DB) rollback(tx *Tx) error {
-	for key, value := range tx.rollbacks {
-		if value == nil {
-			delete(db.data, key)
+	defer db.unlock(tx.write)
+	if !tx.write {
+		return ErrCannotRollbackReadTransaction
+	}
+
+	for name, bucket := range tx.rollbackBuckets {
+		if bucket == nil {
+			db.deleteBucket(name)
 			continue
 		}
 
-		db.data[key] = *value
+		db.buckets[name] = bucket
 	}
 
-	db.unlock(tx.write)
+	for bucket, rollback := range tx.rollbacks {
+		b, exists := db.buckets[bucket]
+		if exists {
+			err := b.rollback(rollback)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -235,39 +242,11 @@ func (db *DB) unlock(write bool) {
 	db.mutex.RUnlock()
 }
 
-func (db *DB) get(key string) *Item {
-	if item, exists := db.data[key]; exists {
-		return &item
-	}
-
-	return nil
-}
-
-func (db *DB) exists(key string) bool {
-	_, exists := db.data[key]
-	return exists
-}
-
-func (db *DB) insert(item *Item) {
-	db.data[item.Key] = *item
-}
-
-func (db *DB) remove(item *Item) {
-	delete(db.data, item.Key)
-}
-
-func (db *DB) hasIndex(name string) bool {
-	_, exists := db.indexes[name]
-	return exists
-}
-
-func (db *DB) index(item *Item) []string {
-	var indexes []string
-	for name, index := range db.indexes {
-		if index.match(item) {
-			index.add(item)
-			indexes = append(indexes, name)
+func firstNonNil(errs ...error) error {
+	for _, err := range errs {
+		if err != nil {
+			return err
 		}
 	}
-	return indexes
+	return nil
 }

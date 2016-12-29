@@ -26,4 +26,10 @@ var (
 
 	// ErrIndexDoesNotExist when an index doesn't exist, usually when attempting to iterate/scan
 	ErrIndexDoesNotExist = errors.New("Index doesn't exist")
+
+	// ErrCannotDeleteRootBucket when an attempt to delete the root bucket is made
+	ErrCannotDeleteRootBucket = errors.New("Cannot delete root bucket")
+
+	// ErrCannotRollbackReadTransaction when you try and roll back a read-only transaction
+	ErrCannotRollbackReadTransaction = errors.New("Read-only transactions cannot be rolled back")
 )

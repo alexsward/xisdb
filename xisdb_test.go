@@ -9,6 +9,7 @@ func openTestDB() *DB {
 	db, _ := Open(&Options{
 		InMemory:           true,
 		BackgroundInterval: -1,
+		DisableExpiration:  true,
 	})
 	return db
 }
@@ -17,7 +18,7 @@ func openTestDB() *DB {
 // Underlying APIs will be used that these tests will assume pass appropriately
 
 func TestXisGet(t *testing.T) {
-	fmt.Println("--- TestXisGet")
+	fmt.Println("-- TestXisGet")
 	tests := []struct {
 		key, value string
 		add        bool
@@ -48,7 +49,7 @@ func TestXisGet(t *testing.T) {
 }
 
 func TestXisExists(t *testing.T) {
-	fmt.Println("--- TestXisExists")
+	fmt.Println("-- TestXisExists")
 	tests := []struct {
 		key         string
 		add, exists bool

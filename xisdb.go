@@ -9,6 +9,22 @@ import (
 // If you need complicated interactions, you need to use the db.Read() and
 // db.ReadWrite() functions directly with a transaction function
 
+// Bucket creates a bucket with the given name in the database, or no-op if it exists
+func (db *DB) Bucket(name string) error {
+	return db.ReadWrite(func(tx *Tx) error {
+		_, err := tx.Bucket(name)
+		return err
+	})
+}
+
+// DeleteBucket will delete a bucket from the database, if it exists
+func (db *DB) DeleteBucket(name string) error {
+	return db.ReadWrite(func(tx *Tx) error {
+		_, err := tx.DeleteBucket(name)
+		return err
+	})
+}
+
 // Get returns a value from the database
 func (db *DB) Get(key string) (string, error) {
 	var val string
@@ -56,7 +72,8 @@ func (db *DB) AddIndex(name string, it IndexType, m indexes.Matcher, c xistree.C
 	if name == "" {
 		return ErrInvalidIndexName
 	}
-	if _, exists := db.indexes[name]; exists {
+	b := db.root()
+	if _, exists := b.indexes[name]; exists {
 		return ErrIndexAlreadyExists
 	}
 

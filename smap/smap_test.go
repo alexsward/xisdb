@@ -6,7 +6,7 @@ import (
 )
 
 func TestSmapSize(t *testing.T) {
-	fmt.Println("--- TestSmapSize")
+	fmt.Println("-- TestSmapSize")
 	m := new()
 	assertSmapSize(t, m, 0)
 	if !m.isEmpty() {
@@ -17,7 +17,7 @@ func TestSmapSize(t *testing.T) {
 }
 
 func TestSmapContainsValue(t *testing.T) {
-	fmt.Println("--- TestSmapContainsValue")
+	fmt.Println("-- TestSmapContainsValue")
 	m := new()
 	m.put("1", "a")
 	contains := m.containsValue("a")
@@ -31,7 +31,7 @@ func TestSmapContainsValue(t *testing.T) {
 }
 
 func TestSmapDelete(t *testing.T) {
-	fmt.Println("--- TestSmapDelete")
+	fmt.Println("-- TestSmapDelete")
 	m := new()
 	m.put("1", "a")
 	assertSmapValue(t, m, "1", "a")
@@ -43,7 +43,7 @@ func TestSmapDelete(t *testing.T) {
 }
 
 func TestSmapReplace(t *testing.T) {
-	fmt.Println("--- TestSmapReplace")
+	fmt.Println("-- TestSmapReplace")
 	m := new()
 	replaced := m.replace("1", "a")
 	if replaced {
@@ -55,7 +55,7 @@ func TestSmapReplace(t *testing.T) {
 }
 
 func TestSmapMerge(t *testing.T) {
-	fmt.Println("--- TestSmapMerge")
+	fmt.Println("-- TestSmapMerge")
 	m1 := new()
 	m1.put("1", "a")
 	m1.put("2", "b")
@@ -73,7 +73,7 @@ func TestSmapMerge(t *testing.T) {
 }
 
 func TestSmapTransform(t *testing.T) {
-	fmt.Println("--- TestSmapTransform")
+	fmt.Println("-- TestSmapTransform")
 	m := new()
 	m.put("1", "a")
 	m.put("2", "a")
@@ -99,7 +99,7 @@ func TestSmapTransform(t *testing.T) {
 }
 
 func TestSmapAlter(t *testing.T) {
-	fmt.Println("--- TestSmapAlter")
+	fmt.Println("-- TestSmapAlter")
 	m := new()
 	alter := func(x string) string {
 		return "b"

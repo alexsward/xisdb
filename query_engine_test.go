@@ -9,7 +9,7 @@ import (
 )
 
 func TestQueryEngineExecuteGet(t *testing.T) {
-	fmt.Println("--- TestQueryEngine")
+	fmt.Println("-- TestQueryEngine")
 	db := openTestDB()
 	db.Set("key", "value")
 	ch := make(chan Item, 0)

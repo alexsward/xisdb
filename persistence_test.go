@@ -5,6 +5,6 @@ import (
 	"testing"
 )
 
-func TestReadFile(t *testing.T) {
-	fmt.Println("--- TestPersistenceReadFile")
+func TestPersistenceReadFile(t *testing.T) {
+	fmt.Println("-- TestPersistenceReadFile")
 }
