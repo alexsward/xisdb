@@ -7,11 +7,12 @@ XisDB is an experimental low-level key-value database written in Go. Its purpose
 ### Features
 - In-memory
 - Supports transactions and rollbacks
+- Custom Indexes
+- Query language
+- Buckets of keys
 - ACID compliant
 - Disk Persistence
 
 ### Upcoming features
-- Custom indexes
 - PubSub on key changes
-- Key expiration
 - Point-in-time restores
